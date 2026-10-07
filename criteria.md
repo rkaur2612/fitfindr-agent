@@ -42,59 +42,45 @@ Given a query that matches no listings, the agent stops before calling
 
 ---
 
-## 3. Something about state
+## 3. The selected item's state carries through unchanged
 
-<!-- YOU WRITE THIS ONE.
+Given a query that matches at least one listing, the `id` of
+`session["selected_item"]` equals the `id` of the `new_item` actually passed
+into `suggest_outfit` — 5 of 5 tries.
 
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
+**Why this target:** The state-passing logic is deterministic code, not a
+model call — nothing about moving a value through the session should vary
+between runs, so a perfect score is the right bar here, unlike criterion 1
+which depends on an imperfect keyword search.
 
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
+---
 
+## 4. The fit card isn't secretly deterministic
 
+Running `create_fit_card` 3 times on the same item produces 3 outputs that are
+not word-for-word identical to each other — in 3 of 3 tries.
 
-**Why this target:**
+**Why this target:** The caption calls a model specifically so the wording
+varies; word-for-word identical output across all 3 runs would mean caching or
+a temperature of 0 is silently making the tool deterministic when it
+shouldn't be — this is the simplest check that catches that failure.
 
 
 
 ---
 
-## 4. Something about the fit card
+## 5. The size-match rule avoids false substring matches
 
-<!-- YOU WRITE THIS ONE.
+Testing `search_listings` with 5 different size queries (`"M"`, `"L"`, `"S"`,
+`"XL"`, `"W28"`) against the full listings dataset, the whole-token match
+never produces a false positive — specifically, querying size `"L"` never
+returns a listing whose size is `"XL (oversized)"`, and querying `"S"` never
+returns a listing sized `"W28"` — in 5 of 5 test cases.
 
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
-
-**Why this target:**
-
-
-
----
-
-## 5. Your choice
-
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
-
-**Why this target:**
+**Why this target:** This is deterministic filtering code, not a model call,
+so a perfect score is the right bar — same reasoning as criterion 3. The
+target specifically guards against the exact substring trap the tool's own
+docstring warns about (`"l" in "xl"` being `True`).
 
 
 
