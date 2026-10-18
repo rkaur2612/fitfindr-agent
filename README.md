@@ -314,14 +314,57 @@ that produced it:
 **Happy path**
 
 ```
-
+$ python app.py ask 'vintage graphic tee under $30' --trace
+[1] parse query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] select item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    first result goes into session['selected_item']
+[4] suggest_outfit
+      in:  dict with keys: item, wardrobe_items
+      out: Here is a Y2K-inspired outfit using your new butterfly baby tee and pieces from your wardrobe:  **The Outfit: …
+[5] create_fit_card
+      in:  dict with keys: item
+      out: finally scored this little butterfly print Y2K baby tee on depop for just $18! honestly obsessed with the earl…
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'purple tuxedo with sequins size XXS under $3' --trace
+[1] parse query
+      in:  purple tuxedo with sequins size XXS under $3
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    search returned [] — stopping, suggest_outfit not called
+
+  Nothing matched 'purple tuxedo sequins', size XXS, under $3. Try to use fewer or different keywords, or drop or change the size, or raise the price limit.
+```
+
+**The three failures, triggered on purpose**
 
 ```
+Empty search     python app.py ask 'purple tuxedo with sequins size XXS under $3'
+                 -> Nothing matched 'purple tuxedo sequins', size XXS, under $3. Try to use fewer or different keywords, or drop or change the size, or raise the price limit.
+
+Empty wardrobe   python app.py ask 'vintage graphic tee under $30' --empty-wardrobe
+                 -> Outfit: Since I don't know what's in your closet yet, here are two foolproof ways to style that Y2K butterfly tee: ... (general advice, then a fit card)
+
+Model unavailable  GEMINI_API_KEY set to a bad value for one process, new query:
+                 python app.py ask 'baggy cargo pants size W29 under $40'
+                 Before the handler: "ModelUnavailable: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com." (exit code 1, no outfit)
+                 After the handler (agent.py::run_agent):
+                 -> The model couldn't be reached while running 'suggest', so no outfit or fit card was made. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com. Fix the key, then run the same query again.
+```
+
+I triggered the bad key with an environment variable for a single process, so `.env` was never edited. The handler catches `ModelUnavailable` around the whole loop and stores the message in `session["error"]`, leaving `outfit_suggestion` and `fit_card` as `None`.
 
 **On the MCP move:** <!-- what changed in your code, and whether anything
 behaved differently afterwards. If the rewire didn't work, say exactly where it

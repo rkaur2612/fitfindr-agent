@@ -113,40 +113,69 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     # Each pass runs one step, writes its result into the session, and picks the
     # next step from what the session now holds.
+    trace.step("parse query", inputs=query, returned=session["parsed"])
+
     next_step = "search"
     count = 0
-    while next_step != "done":
-        count += 1
-        trace.check_iterations(count)
+    try:
+        while next_step != "done":
+            count += 1
+            trace.check_iterations(count)
 
-        if next_step == "search":
-            parsed = session["parsed"]
-            session["search_results"] = call_tool("search_listings", {
-                "description": parsed["description"],
-                "size": parsed["size"],
-                "max_price": parsed["max_price"],
-            })
+            if next_step == "search":
+                parsed = session["parsed"]
+                session["search_results"] = call_tool("search_listings", {
+                    "description": parsed["description"],
+                    "size": parsed["size"],
+                    "max_price": parsed["max_price"],
+                })
+                trace.step(
+                    "search_listings (via MCP)",
+                    inputs=parsed,
+                    returned=session["search_results"],
+                )
 
-            # THE BRANCH: nothing came back, so stop. suggest_outfit is never
-            # called with nothing.
-            if not session["search_results"]:
-                session["error"] = _no_results_message(parsed)
-                return session
+                # THE BRANCH: nothing came back, so stop. suggest_outfit is
+                # never called with nothing.
+                if not session["search_results"]:
+                    session["error"] = _no_results_message(parsed)
+                    trace.step("branch", note="search returned [] — stopping, suggest_outfit not called")
+                    return session
 
-            session["selected_item"] = session["search_results"][0]
-            next_step = "suggest"
+                session["selected_item"] = session["search_results"][0]
+                trace.step("select item", returned=session["selected_item"],
+                           note="first result goes into session['selected_item']")
+                next_step = "suggest"
 
-        elif next_step == "suggest":
-            session["outfit_suggestion"] = suggest_outfit(
-                session["selected_item"], session["wardrobe"]
-            )
-            next_step = "card"
+            elif next_step == "suggest":
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"], session["wardrobe"]
+                )
+                trace.step(
+                    "suggest_outfit",
+                    inputs={"item": session["selected_item"],
+                            "wardrobe_items": len(session["wardrobe"].get("items", []))},
+                    returned=session["outfit_suggestion"],
+                )
+                next_step = "card"
 
-        elif next_step == "card":
-            session["fit_card"] = create_fit_card(
-                session["outfit_suggestion"], session["selected_item"]
-            )
-            next_step = "done"
+            elif next_step == "card":
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"], session["selected_item"]
+                )
+                trace.step(
+                    "create_fit_card",
+                    inputs={"item": session["selected_item"]},
+                    returned=session["fit_card"],
+                )
+                next_step = "done"
+    except ModelUnavailable as exc:
+        session["error"] = (
+            f"The model couldn't be reached while running {next_step!r}, so no "
+            f"{'outfit or fit card' if next_step == 'suggest' else 'fit card'} "
+            f"was made. {exc} Fix the key, then run the same query again."
+        )
+        trace.step("model unavailable", note=f"stopped at {next_step!r}")
 
     return session
 
