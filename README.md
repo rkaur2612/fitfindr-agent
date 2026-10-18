@@ -366,13 +366,26 @@ size 'W28': PASS — 2 returned, sizes ['W28']
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Full three-tool run returns a fit card | 4 of 5 | **MET** (5/5) | Counted tries where the run had no error, `search_results` was non-empty and a fit card came back. All five did, and each card also named the price and the platform. |
+| 2 | Empty search stops before tool 2 | 5 of 5 | **MET** (5/5) | In all five tries `session["error"]` was set, the trace goes `search_listings` → `branch` with no `suggest_outfit` line, and `fit_card` stayed empty. The message named the searched words, the size and the price, and what to change. |
+| 3 | Item in session matches item passed on | 5 of 5 | **MET** (5/5) | The `id` of `session["selected_item"]` and the `id` on the `suggest_outfit` trace line were `lst_007` in all five tries. See the caveat below about how strong that evidence is. |
+| 4 | Fit card not identical across runs | 3 of 3 | **MET** (5/5) | Compared the five fit cards for the same item (`lst_002`) word for word. No two were identical. I counted a try as a PASS when its card matched no other card. |
+| 5 | Size match has no false substring hits | 5 of 5 | **MET** (5/5) | For each of `M`, `L`, `S`, `XL`, `W28`, every returned listing had that size as a whole token. `"L"` never returned `XL (oversized)`, and `"S"` never returned `US 9`, `One Size` or `XL (oversized)`. |
 
 **Diagnoses**
+
+There were no misses, so there is nothing to trace to a tool, the branch, the session or the model's output. The more useful finding is about the test, not the agent. These passes tell me less than they look like they do.
+
+- **Criterion 1 is the criterion to tighten, and the test did not match the reason I gave for its target.** I set 4 of 5 because "my search is a plain keyword match and some phrasings will miss". But all five tries ran the same query, `vintage graphic tee under $30`, so phrasing never varied and the target could not have been missed for that reason. After the run I tried other phrasings against the parser and `search_listings` only (no model calls; this is exploratory and not part of the run log above):
+  - `"I'd love a cute top for a night out, size M, under $25"` parsed to the description `'d love cute top night out'`, because the apostrophe splits "I'd" into `i` and `d`.
+  - `"a warm winter coat under 60 dollars"` left the word "dollars" in the description, and the search returned 0 results.
+  - `"Under $20 t-shirt"` parsed to `'t shirt'` and ranked a polo shirt first.
+  - `"medium black hoodie"` did not read "medium" as a size.
+  These are all in the query parser (`agent.py::_parse_query`) and the keyword search, which is the "phrasing" weakness I predicted. A fairer criterion 1 would run several different phrasings and keep the fit-card requirement.
+- **Criterion 3's evidence is weaker than the 5/5 suggests.** The `suggest_outfit` trace line prints the id read from the same session value the call uses, so it confirms the call used the session's item but could not show the two drifting apart some other way. A stronger check would capture the argument inside `suggest_outfit` itself.
+- **Criterion 4 passed on a loose reading.** The five cards differ, but they share openings (cards 1 and 2 both start "Found the ultimate…", cards 4 and 5 both start "scored this…", and four of the five use "obsessed"). "Not word-for-word identical" is a low bar. The wording in the criterion also says "3 of 3 tries" while the run log has five columns, so I scored five cards instead.
+- **Criterion 5 has a wording slip, not a measurement problem.** The criterion says querying `"S"` must never return `W28`, but a plain substring test on `"S"` could never match `W28` (it has no letter S). The real traps the check covers are `US 9`, `One Size` and `XL (oversized)`, and the filter avoided them. The target and the check are fine, so I have not revised the criterion.
+- **Pattern:** the passes came from the three things I kept fixed: one query for criteria 1 and 4, one item, and deterministic code for criteria 2, 3 and 5. The agent passed because the test was narrow. Criterion 1 is the one I would tighten first, by varying the phrasing and raising the target to 5 of 5.
 
 
 
