@@ -24,10 +24,14 @@ data earns credit; *"80% seemed reasonable"* does not.
 Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
-**Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+**Why this target:** Two of the three tools depend on things I don't control.
+`search_listings` is a plain keyword overlap against titles, descriptions and
+tags, and my query parser is regex-based, so an unusual phrasing ("something
+y2k for summer") can score zero on a query that a person would say should
+match. `suggest_outfit` and `create_fit_card` also call a model, which can be
+rate-limited or unreachable. 4 of 5 leaves room for one of those misses
+without letting the agent fail routinely. 5 of 5 would test my luck with
+phrasing, not my code.
 
 ---
 
@@ -36,9 +40,13 @@ tool calls and returns a fit card — in at least 4 of 5 tries.
 Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
-**Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+**Why this target:** This path never reaches a model. It runs only the keyword
+search, one `if not results` check, and a message built from the parsed query,
+all of which are deterministic code with no rate limits or varying wording. If
+the query truly matches nothing, the same input gives the same stop every time,
+so anything below 5 of 5 would mean the branch itself is broken. The "names
+what to change" half is also checkable: the message must name the searched
+keywords and any size or price filter that was applied.
 
 ---
 

@@ -39,8 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+A user describes a secondhand piece in plain language, such as "a vintage graphic tee under $30, size M". FitFindr pulls the description, size and price ceiling out of the query and searches the listings data. It then picks the best match and suggests one or two outfits that pair it with pieces from the user's wardrobe, or general styling advice if the wardrobe is empty. Finally it writes a short social-media-style caption for the find. If nothing matches, it stops early and says what to change instead of going on with nothing.
 
 
 ---
@@ -223,15 +222,15 @@ Found the holy grail of denim today on depop—these vintage Levi's 501s in the 
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude to review my finished `tools.py` before I tested it.
+- *What came back:* It said `search_listings` counts every word of the description toward the score, so filler like "a", "under" or "looking" would match listings that merely contain those words and push weak results up. It also said it could not confirm the wardrobe item keys (`name`, `category`) that `suggest_outfit` reads until the tool was run.
+- *What I changed:* I added filler-word removal to the query parser, `agent.py::_parse_query`, so the description handed to `search_listings` is just the item words (for example "vintage graphic tee"). I ran `suggest_outfit` against the example wardrobe and it named real wardrobe pieces, so the keys were correct.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude to run `create_fit_card` three times on the same item, as Milestone 4 requires.
+- *What came back:* All three captions were word-for-word identical. `TEMPERATURE` was already 0.9, so Claude pointed to `CACHE_ENABLED`, which defaults to on. It then re-ran with `AI201_CACHE=0`, and the three captions came out different.
+- *What I changed:* I left the cache on in `config.py`, because it makes debugging free, and recorded both sets of runs under Sample Run. Criterion 4 is the check that catches this: it only means something with the cache off, which is how `run_eval.py` runs.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
