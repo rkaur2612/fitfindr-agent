@@ -35,18 +35,28 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Criterion 3 — state. A different matching query from criterion 1, so
+        # it isn't just the same run twice. Judged by comparing
+        # session["selected_item"]["id"] with the `item id=` in the trace's
+        # suggest_outfit step.
+        "name": "selected item carries through",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4 — the fit card. The SAME query five times, so the same
+        # item each time (the first search result is deterministic). Judged by
+        # comparing the five fit cards word for word.
+        "name": "fit card, same item repeated",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    # Criterion 5 (the size-match rule) tests search_listings directly with five
+    # different size queries, so it can't be five identical tries of one query.
+    # It lives in check_size_filter.py, and its five cases are the five tries.
 ]
 
 WARDROBES = ("example", "empty")

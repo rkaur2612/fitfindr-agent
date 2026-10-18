@@ -252,17 +252,96 @@ Found the holy grail of denim today on depop—these vintage Levi's 501s in the 
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Full three-tool run returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card not identical across runs | 3 of 3 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Size match has no false substring hits | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+Produced by `run_eval.py --label before` (cache off, temperature 0.9, 40 model
+calls, no crashes). Full log: `results/run_2026-10-18_1311_before.md`. Criterion 5
+comes from `check_size_filter.py`, where the five tries are the five sizes `M`,
+`L`, `S`, `XL`, `W28`, not five identical runs.
+
+What counted as a PASS for each row:
+
+1. The run ended with no error, `search_results` non-empty, and a non-empty fit card. All five also mentioned the price and the platform.
+2. The run stopped with `session["error"]` naming the search and what to change, `suggest_outfit` never appears in the trace, and `fit_card` is empty.
+3. The `id` of `session["selected_item"]` is the same `id` printed on the `suggest_outfit` trace line (`lst_007` in all five).
+4. Try N is a PASS if its fit card is not word-for-word identical to any other card for the same item. All five cards for `lst_002` are different.
+5. Every listing returned for that size has the size as a whole token (`check_size_filter.py`).
+
+**Real output from one try per criterion**, pasted as text.
+
+*Criterion 1 — `agent.py::run_agent` via `run_eval.py`, try 1, `vintage graphic tee under $30`:*
 
 ```
+[1] parse query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] select item
+      out: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      →    first result goes into session['selected_item']
+[4] suggest_outfit
+      in:  item id=lst_002 (Y2K Baby Tee — Butterfly Print), wardrobe items=10
+      out: Here are two outfit ideas using your new butterfly Y2K baby tee and pieces straight from your wardrobe:  **Out…
+[5] create_fit_card
+      in:  item id=lst_002 (Y2K Baby Tee — Butterfly Print)
+      out: Found this adorable butterfly baby tee on depop for just $18 and I’m literally obsessed. It gives major early …
+```
 
+*Criterion 2 — `agent.py::run_agent`, try 1, `designer ballgown size XXS under $5`:*
+
+```
+- stopped early: yes — Nothing matched 'designer ballgown', size XXS, under $5. Try to use fewer or different keywords, or drop or change the size, or raise the price limit.
+- selected_item: (none)
+- search_results: 0
+[1] parse query
+[2] search_listings (via MCP)
+      out: [] (empty)
+[3] branch
+      →    search returned [] — stopping, suggest_outfit not called
+```
+
+*Criterion 3 — `agent.py::run_agent`, try 1, `denim jacket under $50`:*
+
+```
+[3] select item
+      out: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+[4] suggest_outfit
+      in:  item id=lst_007 (Denim Jacket — Light Wash, Cropped), wardrobe items=10
+[5] create_fit_card
+      in:  item id=lst_007 (Denim Jacket — Light Wash, Cropped)
+```
+
+*Criterion 4 — `tools.py::create_fit_card`, the five fit cards for `lst_002` (tries 1–5):*
+
+```
+1 Found the ultimate Y2K butterfly baby tee on depop for just $18 and I am never taking it off. Gives major early 2000s pop princess energy, especially paired with low-rise denim. Grab it before I change my mind! 🦋✨
+2 Found the ultimate butterfly baby tee on depop for just $18 and I am obsessed. The Y2K nostalgia is so real with this one—it gives major early 2000s mall rat energy. Can't wait to style it with baggy denim and combat boots all fall. 🦋✨
+3 Found this absolute dream of a Y2K butterfly print baby tee on Depop for just $18 and I’m never taking it off. Pairing it with baggy dark wash denim and a black jacket gives me the exact sweet-yet-edgy vibe I've been looking for. So obsessed with how this turned out! 🦋✨
+4 scored this butterfly print baby tee on depop for just $18 and I’m literally obsessed. throwing it on with some baggy dark denim and chunky sneakers for the ultimate Y2K streetwear look. so ready to live out my early 2000s pop star dreams in this.
+5 scored this literal dream y2k butterfly baby tee on depop for just $18 and i am obsessed 🦋 pairing it with baggy jeans and chunky sneakers for max 2000s energy. so ready to live out my inner pop star era in this!
+```
+
+*Criterion 5 — `check_size_filter.py` (calls `tools.py::search_listings`):*
+
+```
+size 'M': PASS — 14 returned, sizes ['M', 'M/L', 'S/M']
+    a substring test would also have matched: nothing extra
+size 'L': PASS — 8 returned, sizes ['L', 'L/XL', 'M/L']
+    a substring test would also have matched: ['One Size (adjustable)', 'W30 L30', 'XL', 'XL (fits oversized)', 'XL (oversized)']
+size 'S': PASS — 6 returned, sizes ['S', 'S/M']
+    a substring test would also have matched: ['One Size', 'One Size (adjustable)', 'One Size / Oversized', 'US 7', 'US 8', 'US 8.5', 'US 9', 'XL (fits oversized)', 'XL (oversized)']
+size 'XL': PASS — 4 returned, sizes ['L/XL', 'XL', 'XL (fits oversized)', 'XL (oversized)']
+    a substring test would also have matched: nothing extra
+size 'W28': PASS — 2 returned, sizes ['W28']
+    a substring test would also have matched: nothing extra
+
+5 of 5 cases passed
 ```
 
 ---
