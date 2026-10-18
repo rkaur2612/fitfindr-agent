@@ -98,9 +98,9 @@
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex and word filtering — no model call (`agent.py::_parse_query`). A `$30` amount (or "under/below/max/up to 30") becomes `max_price`; the word after "size" becomes `size`, uppercased; the description is what remains after removing those phrases and filler words like "looking for a". The result is stored in `session["parsed"]`.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** In order: `query` → `parsed` → `search_results` → `selected_item` (the first result) → `outfit_suggestion` → `fit_card`. Each step writes its result to the session, and the next step reads its input back out of the session rather than from a local variable. On an empty search, `error` is set to a message naming the search and what to change, and `outfit_suggestion` and `fit_card` stay `None`.
 
 ---
 
@@ -114,8 +114,32 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
+  Outfit:   Here is a Y2K-inspired outfit using your new butterfly baby tee and pieces from your wardrobe:
+
+**The Outfit: Sweet & Edgy Y2K Streetwear**
+*   **Top:** Y2K Baby Tee — Butterfly Print 
+*   **Bottoms:** Baggy straight-leg jeans, dark wash
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+**Why it works:** 
+The fitted silhouette of the butterfly baby tee creates a great contrast against the relaxed, slouchy fit of the baggy dark wash jeans—a signature Y2K proportion play. Tossing on the vintage black denim jacket keeps the color palette grounded while leaning into that early-2000s grunge-meets-girly vibe. Finish the look with the chunky white sneakers to tie in the white from the tee, and sling the black crossbody bag over your shoulder for effortless everyday wear.
+
+  Fit card: finally scored this little butterfly print Y2K baby tee on depop for just $18! honestly obsessed with the early 2000s grunge-meets-girly vibe. throwing it on with baggy jeans and chunky sneakers for the ultimate casual street fit. ✨🦋
+
+0 model calls this session, 2 served from cache
+```
+
+And a query that matches nothing, which stops before `suggest_outfit`:
+
+```
+$ python agent.py     (second example)
+  stopped: Nothing matched 'designer ballgown', size XXS, under $5. Try to use fewer or different keywords, or drop or change the size, or raise the price limit.
+  fit_card is None — it should still be None here
 ```
 
 **The three tools, tested one at a time**
