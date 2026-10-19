@@ -232,6 +232,20 @@ Found the holy grail of denim today on depop—these vintage Levi's 501s in the 
 - *What came back:* All three captions were word-for-word identical. `TEMPERATURE` was already 0.9, so Claude pointed to `CACHE_ENABLED`, which defaults to on. It then re-ran with `AI201_CACHE=0`, and the three captions came out different.
 - *What I changed:* I left the cache on in `config.py`, because it makes debugging free, and recorded both sets of runs under Sample Run. Criterion 4 is the check that catches this: it only means something with the cache off, which is how `run_eval.py` runs.
 
+**Unit 4 moments**
+
+**Moment 3**
+
+- *What I asked for:* I asked Claude to run my five criteria five times each and give a verdict and diagnosis for each.
+- *What came back:* Every criterion came out MET. Claude did not stop there: it pointed out that criterion 1's reason for a 4-of-5 target was "some phrasings will miss", yet all five tries used the same query, so phrasing had never been tested. It probed other phrasings against the parser and found apostrophe fragments (`'d love`), a leftover "dollars", `t-shirt` split in two, and "size small" passed through as a size.
+- *What I changed:* I widened `scenarios.py` with four phrasings and re-ran the baseline before touching code. Two failed 0/5. I then fixed only `agent.py::_parse_query` and re-ran: both went to 5/5 and criteria 2 to 5 were unchanged.
+
+**Moment 4**
+
+- *What I asked for:* I asked Claude to write the verdicts and the improvement write-up from the run logs.
+- *What came back:* Two statements in its drafts did not match the logs. It said the denim jacket was on Depop (the log says Poshmark), and that all five fit cards "end in the same obsessed / pop star energy" (one card does not; four of five use "obsessed").
+- *What I changed:* Both were checked against the logged output and corrected before the commit. The Verdicts section now says "four of the five use 'obsessed'", and the pasted `selected_item` line says Poshmark.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -458,10 +472,7 @@ Model unavailable  GEMINI_API_KEY set to a bad value for one process, new query:
 
 I triggered the bad key with an environment variable for a single process, so `.env` was never edited. The handler catches `ModelUnavailable` around the whole loop and stores the message in `session["error"]`, leaving `outfit_suggestion` and `fit_card` as `None`.
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** I moved `search_listings` onto MCP, the one tool that doesn't call a model. In `mcp_server.py` I registered it with a description written for an agent that can't see my code (it names units and types, states the size-match rule and the 10-result cap, and says an empty list comes back when nothing matches). In `agent.py::run_agent` I replaced the direct call with `mcp_client.call_tool("search_listings", {...})`. The other two tools are still called directly. Nothing behaved differently: for the same inputs the MCP call and the direct call returned identical lists (`graphic tee` under $30 gave the same 6 listings, and a no-match query gave a real `[]`, not `None` or a string), and the end-to-end runs and the empty-search stop were unchanged. The one difference I can name is that every call starts and stops a server process, so it does more work per call than a function call; I did not time it. The trace labels the step `search_listings (via MCP)`.
 
 
 
@@ -532,9 +543,15 @@ selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)   (lst_007
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No criterion is missed on the final test (all nine rows MET in the After log), but that does not mean nothing is left. The test is narrower than the claims it supports, and I stopped at one improvement because this unit allows only the MCP move and one fix.
+
+- **The parser is fixed for one class of phrasing, not all of them.** I fixed spelled-out sizes, money words, apostrophe fragments and "t-shirt". Things I know are still unhandled: a bare "medium" with no "size" before it is left in the description (deliberately, since "medium wash" is a denim colour), and any other way of saying a size or price. I would add more phrasings to `scenarios.py` and fix what failed, one class at a time. I stopped because the unit allows one improvement.
+- **Search ranking is loose.** `graphic tee` under $30 returns cargo pants and a hoodie below the tees, and `denim jacket under $50` puts jeans second, because a listing scores on any shared word. The agent only uses the first result, so it hasn't cost a criterion. I would score titles and tags higher than descriptions and use the first result's category. I stopped because no criterion missed on it.
+- **Criterion 3's evidence is weak.** The trace prints the id from the same session value the call uses, so it cannot show them drifting apart. I would log the argument inside `suggest_outfit` itself.
+- **Criterion 4 is a low bar.** Five cards that are not identical still share openings ("Found the ultimate…" twice, "scored this…" twice). I would rewrite it as "no two of five cards share their first sentence" and put the reason under the original, as the brief allows for criteria that can't be measured.
+- **Criterion 5 has a wording slip.** It says `"S"` must never return `W28`, which a substring test could never do. The check covers the real traps (`US 9`, `One Size`, `XL (oversized)`) and passes; I would fix the example in a revision under the original.
+- **Two messages I have not run past a second reader.** The model-unavailable message ends with a long "Check GEMINI_API_KEY in your .env file… Fix the key, then run the same query again", and the empty-search message reads "Try to use fewer… or drop… or raise…". The brief's peer-or-model review of the failure messages is still undone.
+- **Not attempted:** the stretch items (a second tool on MCP, retry with looser constraints). Retry with looser constraints would help a size-filtered search that comes back empty.
 
 
 
