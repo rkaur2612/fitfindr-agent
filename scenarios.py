@@ -21,6 +21,39 @@ SCENARIOS = [
         "wardrobe": "example",
         "criterion": 1,
     },
+    # Criterion 1, other phrasings. Added in unit 4 Milestone 5 after the
+    # diagnosis found that every try of criterion 1 used one well-formed query,
+    # so its "some phrasings will miss" reason was never tested. Each of these
+    # is something the data CAN match, so a failure here is the parser's.
+    {
+        # Apostrophe in "I'd". Expected to pass both before and after: a control.
+        "name": "phrasing: apostrophe and filler",
+        "query": "I'd love a cute top for a night out, size M, under $25",
+        "wardrobe": "example",
+        "criterion": 1,
+    },
+    {
+        # "size small" and "dollars" instead of "S" and "$50".
+        "name": "phrasing: size word and 'dollars'",
+        "query": "a denim jacket in size small under 50 dollars",
+        "wardrobe": "example",
+        "criterion": 1,
+    },
+    {
+        # "t-shirt" split into "t" and "shirt". Completes either way; a control
+        # for the fact that criterion 1 does not judge whether the item is right.
+        "name": "phrasing: t-shirt",
+        "query": "Under $20 t-shirt",
+        "wardrobe": "example",
+        "criterion": 1,
+    },
+    {
+        # "size large" spelled out.
+        "name": "phrasing: size large",
+        "query": "grab me a black hoodie, size large, under $30",
+        "wardrobe": "example",
+        "criterion": 1,
+    },
     {
         # A query nothing can match. Criterion 2 — the branch.
         "name": "impossible query stops early",

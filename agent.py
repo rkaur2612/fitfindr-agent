@@ -195,6 +195,15 @@ _FILLER = {
     "for", "find", "show", "get", "some", "something", "in", "under", "below",
     "over", "max", "maximum", "less", "than", "up", "to", "size", "and", "or",
     "please", "with", "of",
+    # money words ("under 50 dollars") and the fragments left when an
+    # apostrophe splits a word ("I'd" -> "i", "d"; "don't" -> "don", "t")
+    "dollar", "dollars", "bucks", "usd", "d", "s", "ll", "m", "ve", "re", "t",
+}
+
+# "size small" / "size large" -> the labels the listings actually use.
+_SIZE_WORDS = {
+    "small": "S", "medium": "M", "large": "L",
+    "extra small": "XS", "extra large": "XL",
 }
 
 
@@ -204,7 +213,10 @@ def _parse_query(query: str) -> dict:
 
     Uses regex and word filtering, no model call:
       - price: a "$30" / "$30.50" amount, or "under/below/max/up to 30"
-      - size:  the word after "size" ("size M", "size XXS")
+      - size:  the word after "size" ("size M", "size XXS"); spelled-out sizes
+               ("size small") map to S/M/L/XL, since listings use labels
+               (the mapping only applies after the word "size", because
+               "medium wash" is a denim colour, not a size)
       - description: what is left, minus the price and size phrases and filler
     """
     text = query
@@ -218,10 +230,16 @@ def _parse_query(query: str) -> dict:
         text = text.replace(price_match.group(0), " ")
 
     size = None
-    size_match = re.search(r"\bsize\s+([A-Za-z0-9]+)", text, re.I)
+    size_match = re.search(
+        r"\bsize\s+(extra\s+(?:small|large)|[A-Za-z0-9]+)", text, re.I
+    )
     if size_match:
-        size = size_match.group(1).upper()
+        said = " ".join(size_match.group(1).lower().split())
+        size = _SIZE_WORDS.get(said, said.upper())
         text = text.replace(size_match.group(0), " ")
+
+    # "t-shirt" would otherwise split into "t" and "shirt"; listings say "tee".
+    text = re.sub(r"\bt[-\s]?shirts?\b", "tee", text, flags=re.I)
 
     words = re.findall(r"[A-Za-z0-9]+", text.lower())
     description = " ".join(w for w in words if w not in _FILLER)

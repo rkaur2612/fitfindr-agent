@@ -474,24 +474,57 @@ full. -->
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** One thing: the query parser, `agent.py::_parse_query`. It now (1) reads a spelled-out size after the word "size" ("size small" → `S`, "size large" → `L`, "size extra large" → `XL`), (2) ignores money words ("dollars", "bucks") and the one-letter fragments left when an apostrophe splits a word ("I'd" → `i`, `d`), and (3) turns "t-shirt" into "tee". The size mapping only applies after the word "size", so "medium wash" is still read as a denim colour. The tools, the loop's branch, and the prompts were not touched.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Criterion 1's diagnosis found that its "some phrasings will miss" reason had never been tested, because all five tries used one well-formed query. To test it, I widened the test before changing any code: four extra phrasings were added to `scenarios.py` (all criterion 1) and the whole test was re-run on the unchanged parser as a new baseline (`results/run_2026-10-18_1320_before-wide.md`). Two phrasings that the data can match failed in every try: `a denim jacket in size small under 50 dollars` and `grab me a black hoodie, size large, under $30`. The parser passed `SMALL` and `LARGE` through as sizes, and no listing's size has that token, so `search_listings` returned `[]` and the loop's branch stopped, correctly, on a bad search. The denim jacket (size S, $42) and the hoodie (size L, $26) are in the data. The miss was in the parser step, not in a tool, the branch, the session, or the model.
 
-### Run Log — After
+### Run Log — Before, widened test (the baseline for the improvement)
+
+The original Run Log — Before above is unchanged and is for the single-query test. This one adds four phrasings to criterion 1 and nothing else.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1a. `vintage graphic tee under $30` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1b. `I'd love a cute top for a night out, size M, under $25` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1c. `a denim jacket in size small under 50 dollars` | 4 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+| 1d. `Under $20 t-shirt` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1e. `grab me a black hoodie, size large, under $30` | 4 of 5 | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card not identical across runs | 3 of 3 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Size match has no false substring hits | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+For 1c and 1e every try stopped early with a message such as `Nothing matched 'denim jacket dollars', size SMALL, under $50.` and no fit card.
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+### Run Log — After
+
+Same scenarios, same five tries, cache off, produced by `python run_eval.py --label after` (`results/run_2026-10-18_1325_after.md`). Criterion 5 comes from `check_size_filter.py` again.
+
+| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1a. `vintage graphic tee under $30` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1b. `I'd love a cute top for a night out, size M, under $25` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1c. `a denim jacket in size small under 50 dollars` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1d. `Under $20 t-shirt` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 1e. `grab me a black hoodie, size large, under $30` | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card not identical across runs | 3 of 3 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Size match has no false substring hits | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Output from one try, `agent.py::run_agent` via `run_eval.py`, for 1c (before it stopped; now it completes and picks the right item):
+
+```
+selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)   (lst_007, size S)
+```
+
+**Did it help, and how do I know:** Yes, for the two phrasings it targeted. On the same widened test, 1c and 1e went from 0/5 to 5/5, which moves criterion 1 from two phrasings missed to none. What I checked:
+
+- **Same test, one change.** The scenarios, tries, cache setting and temperature were identical across the two logs. Only `_parse_query` changed between them.
+- **Nothing else moved.** Criteria 2, 3, 4 and 5 gave the same results before and after; the three `denim jacket` and `vintage graphic tee` scenarios still pick `lst_007` and `lst_002`, and the impossible query still stops before `suggest_outfit` with no fit card in all five tries.
+- **A side effect I did not target.** `Under $20 t-shirt` (1d) passed both times, but before the change it picked a polo shirt (`lst_024`) and now picks the Y2K Baby Tee (`lst_002`). Criterion 1 as written cannot tell the two apart, since both complete with a fit card, so this is a better answer that the criterion does not measure.
+
+**Limits on this result.** The phrasings were chosen after the diagnosis, from a failure class I already knew about, so a gain on them says the fix works for that class; it does not say the parser now handles phrasing in general. The parse step is deterministic, so a phrasing goes 0/5 or 5/5, which means five tries measure the model-calling steps and tell me little about the parser. And I widened the test after the first run came back MET, so the criterion-1 "MET" in the Verdicts table above applies to the single-query test only.
 
 
 
